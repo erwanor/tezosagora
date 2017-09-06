@@ -1,10 +1,10 @@
 package main
 
+import "html/template"
 import "fmt"
 import "math/rand"
-import "time"
 import "net/http"
-import "encoding/json"
+import "time"
 
 import log "github.com/apex/log"
 import "github.com/vrischmann/envconfig"
@@ -35,6 +35,7 @@ func (c Configuration) isProduction() bool {
 }
 
 var config Configuration
+var templates = template.Must(template.ParseFiles("www/invite.html"))
 
 func NewWebResp(status, body string) *WebResp {
 	return &WebResp{
@@ -97,19 +98,6 @@ func generateInvite(channelID string, discord *discordgo.Session) (string, error
 	return inviteURL, nil
 }
 
-func resp(w http.ResponseWriter, status, body string) error {
-	resp := NewWebResp(status, body)
-	b, err := json.Marshal(resp)
-	if err != nil {
-		log.WithError(err).Error("could not marshal response")
-		w.WriteHeader(http.StatusInternalServerError)
-		return err
-	}
-
-	fmt.Fprintf(w, string(b))
-	return nil
-}
-
 func main() {
 	err := envconfig.Init(&config)
 	if err != nil {
@@ -166,7 +154,8 @@ func main() {
 
 		if len(address) != 36 {
 			w.WriteHeader(http.StatusBadRequest)
-			_ = resp(w, "bad input", "")
+			response := NewWebResp("bad input", "")
+			templates.Execute(w, response)
 			return
 		}
 
@@ -183,7 +172,8 @@ func main() {
 
 		if registered {
 			inviteURL, _ := db.Get(nil, []byte(address))
-			_ = resp(w, "wallet already registered", string(inviteURL))
+			response := NewWebResp("wallet already registered", string(inviteURL))
+			templates.Execute(w, response)
 			return
 		}
 
@@ -197,7 +187,8 @@ func main() {
 		}
 
 		if !valid {
-			_ = resp(w, "wallet not found", "")
+			response := NewWebResp("wallet not found", "")
+			templates.Execute(w, response)
 			return
 		}
 
@@ -218,7 +209,8 @@ func main() {
 			return
 		}
 
-		_ = resp(w, "valid unregistered wallet", inviteURL)
+		response := NewWebResp("valid wallet!", inviteURL)
+		templates.Execute(w, response)
 		return
 	}
 
