@@ -4,6 +4,10 @@ html {
       overflow: hidden;
       }
 
+      a {
+          color: grey;
+      }
+
       img{
           right: 0px;
           position: absolute;
