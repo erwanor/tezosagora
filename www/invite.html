@@ -1,0 +1,26 @@
+<html>
+    <head>
+    <title>TezosAgora</title>
+        <link href='https://fonts.googleapis.com/css?family=Lato:300,400,700' rel='stylesheet' type='text/css'>
+		<link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+<div id='title'>
+  <br>
+  <span>
+	TEZOS AGORA
+  </span>
+</div>
+<div id='stars'></div>
+<div id='stars2'></div>
+<div id='stars3'></div>
+        <logo>
+            <img src="tezos.png" alt="tezos" />
+        </logo>
+        <div id="main">
+            <p>Status: {{ .Status }}</p>
+            <p>Your invite URL is <a href="{{ .Body }}"/>{{ .Body }}</a></p>
+        </div>
+    </body>
+</html>
+
