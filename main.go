@@ -11,20 +11,27 @@ import "github.com/vrischmann/envconfig"
 import "github.com/bwmarrin/discordgo"
 import "github.com/cznic/kv"
 
-type Configuration struct {
-	BotToken  string
-	ChannelID string
+type (
+	Configuration struct {
+		BotToken  string
+		ChannelID string
 
-	DBName     string `envconfig:"default=pubkeyhashes.db"`
-	DiscordURL string `envconfig:"default=https://discord.gg"`
-	TezosURL   string `envconfig:"default=https://check.tezos.com"`
+		DBName      string `envconfig:"default=pubkeyhashes.db"`
+		DiscordURL  string `envconfig:"default=https://discord.gg"`
+		Environment string `envconfig:"default=development"`
+		TezosURL    string `envconfig:"default=https://check.tezos.com"`
 
-	Port int `envconfig:"default=8080"`
-}
+		Port int `envconfig:"default=8080"`
+	}
 
-type WebResp struct {
-	Status string `json:"status"`
-	Body   string `json:"body,omitempty"`
+	WebResp struct {
+		Status string `json:"status"`
+		Body   string `json:"body,omitempty"`
+	}
+)
+
+func (c Configuration) isProduction() bool {
+	return c.Environment == "production"
 }
 
 var config Configuration
@@ -41,10 +48,10 @@ func isValidWallet(wallet string) (bool, error) {
 	log.WithFields(log.Fields{
 		"wallet": wallet,
 		"url":    url,
-	}).Info("fetching wallet")
+	}).Debug("fetching wallet")
 	resp, err := http.Get(url)
 	if resp.StatusCode == http.StatusNotFound {
-		log.Info("wallet not found!")
+		log.Warn("wallet not found!")
 		return false, nil
 	}
 
@@ -53,7 +60,7 @@ func isValidWallet(wallet string) (bool, error) {
 		return false, err
 	}
 
-	log.WithField("wallet", wallet).Info("wallet fetched!")
+	log.WithField("wallet", wallet).Debug("wallet fetched!")
 	return true, nil
 }
 
@@ -65,11 +72,11 @@ func isAlreadyRegistered(wallet string, db *kv.DB) (bool, error) {
 	}
 
 	if val != nil {
-		log.WithField("wallet", wallet).Info("wallet already registered")
+		log.WithField("wallet", wallet).Debug("wallet already registered")
 		return true, nil
 	}
 
-	log.WithField("wallet", wallet).Info("wallet is not already registered")
+	log.WithField("wallet", wallet).Debug("wallet is not already registered")
 
 	return false, nil
 }
@@ -109,12 +116,18 @@ func main() {
 		panic(err)
 	}
 
+	if !config.isProduction() {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.WarnLevel)
+	}
+
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	db, err := kv.Open(config.DBName, &kv.Options{})
 	if err != nil {
 		log.WithError(err).Error("failed to open DB")
-		log.Info("trying to create DB")
+		log.Debug("trying to create DB")
 		db, err = kv.Create(config.DBName, &kv.Options{})
 		if err != nil {
 			panic(err)
@@ -139,7 +152,7 @@ func main() {
 			return
 		}
 
-		log.Info("valid form size")
+		log.Debug("valid form size")
 
 		_, exists := r.Form["address"]
 
@@ -148,7 +161,7 @@ func main() {
 			return
 		}
 
-		log.Info("form has address field")
+		log.Debug("form has address field")
 		address := r.Form["address"][0]
 
 		if len(address) != 36 {
@@ -157,9 +170,9 @@ func main() {
 			return
 		}
 
-		log.Info("valid address length")
+		log.Debug("valid address length")
 
-		log.WithField("wallet", address).Info("checking if wallet is already registered")
+		log.WithField("wallet", address).Debug("checking if wallet is already registered")
 
 		registered, err := isAlreadyRegistered(address, db)
 		if err != nil {
@@ -174,7 +187,7 @@ func main() {
 			return
 		}
 
-		log.WithField("wallet", address).Info("checking if wallet exist")
+		log.WithField("wallet", address).Debug("checking if wallet exist")
 
 		valid, err := isValidWallet(address)
 		if err != nil {
@@ -188,7 +201,7 @@ func main() {
 			return
 		}
 
-		log.Info("generating invite link!")
+		log.Debug("generating invite link!")
 		inviteURL, err := generateInvite(config.ChannelID, discord)
 		if err != nil {
 			log.WithError(err).Error("could not generate invite link")
@@ -196,7 +209,7 @@ func main() {
 			return
 		}
 
-		log.WithField("wallet", address).Info("registering address")
+		log.WithField("wallet", address).Debug("registering address")
 
 		err = db.Set([]byte(address), []byte(inviteURL))
 		if err != nil {
